@@ -15,7 +15,15 @@ taki_active = False  # If Taki has been played but not yet closed
 
 
 def try_to_place(info_recv, card, order=""):
+    """
+    This function recieves the card that needs to be sent and creates a message that needs to be sent to the server
+    :param info_recv: Information recieved from the server (json)
+    :param card: Card that needs to be played (json)
+    :param order: Order that needs to be given to the server (string; '' is default)
+    :return: command that needs to be sent to the server (json)
+    """
     global taki_active
+    # This block of code decides whether to close the taki
     if taki_active:
         additional_cards = []
         for crd in info_recv['hand']:
@@ -24,6 +32,7 @@ def try_to_place(info_recv, card, order=""):
         if len(additional_cards) == 0 or card['value'] == 'STOP' or card['value'] == 'CHDIR':
             taki_active = False
             return {'card': card, 'order': 'close_taki'}
+
     if card != '':
         return {'card': card, 'order': order}
     else:
@@ -31,6 +40,12 @@ def try_to_place(info_recv, card, order=""):
 
 
 def choose_card(info_recv, prev_info_recv):
+    """
+    This function chooses which card to play
+    :param info_recv: information received from the server (json)
+    :param prev_info_recv: information that was received last turn from the server (json)
+    :return: The command that needs to be sent to the server (json)
+    """
     global taki_active
     hand = info_recv['hand']
     pile = info_recv['pile']
@@ -38,7 +53,6 @@ def choose_card(info_recv, prev_info_recv):
     pile_color = info_recv['pile_color']
     direction = info_recv['turn_dir']
     other_hands = info_recv['others']
-    options = []
     # This block of code checks if a +2 needs to be added
     if prev_info_recv:
         other_hands_prev = prev_info_recv['others']
@@ -60,6 +74,10 @@ def choose_card(info_recv, prev_info_recv):
     for c in hand:
         if c['value'] == '+' and c['color'] == pile_color:
             return try_to_place(info_recv, c)
+    if taki_active:
+        for c in hand:
+            if (9 <= c['value'] >= 0) and c['color'] == pile_color:
+                return try_to_place(info_recv, c)
     for c in hand:
         if (c['value'] == 'STOP' or c['value'] == 'CHDIR') and c['color'] == pile_color:
             return try_to_place(info_recv, c)
@@ -76,10 +94,8 @@ def choose_card(info_recv, prev_info_recv):
         if c['value'] == 'CHCOL':
             colors = {'red': 0, 'yellow': 0, 'green': 0, 'blue': 0}
             for crd in hand:
-                try:
-                    colors[crd['color']] += 1
-                except:
-                    continue
+                    if crd['color'] != 'ALL':
+                        colors[crd['color']] += 1
             return try_to_place(info_recv, c, order=max(colors, key=colors.get))
     return try_to_place(info_recv, "", 'draw card')
 
@@ -94,19 +110,23 @@ our_id = int(re.findall('[0-9]+', info_recv)[0])  # Retrieval of our ID from the
 print(our_id)
 if our_id > 5:
     our_id = 3
-while True:
-    info_recv = tcpCliSock.recv(BUFSIZ)[4:]
-    try:
-        info_recv = json.loads(info_recv)
-    except:
-        print("JSON NOT RECIEVED:")
-        print(info_recv)
-        sys.exit()
-    turn = info_recv['turn']
-    if turn == our_id:
-        print(info_recv)
-        command = choose_card(info_recv, prev_info_recv)  # Choose which card to play
-        print(command)
-        command = json.dumps(command, **json_kwargs)
-        tcpCliSock.send(command)
-    prev_info_recv = info_recv
+open('info.json', 'w').close() # Erases file contents
+with(open('info.json', 'a')) as f:
+    f.write(json.dumps({'our_id': our_id}))
+    while True:
+        info_recv = tcpCliSock.recv(BUFSIZ)[4:]
+        try:
+            info_recv = json.loads(info_recv)
+        except:
+            print("JSON NOT RECIEVED:")
+            print(info_recv)
+            sys.exit()
+        turn = info_recv['turn']
+        if turn == our_id:
+            print(info_recv)
+            command = choose_card(info_recv, prev_info_recv)  # Choose which card to play
+            print(command)
+            command = json.dumps(command, **json_kwargs)
+            tcpCliSock.send(command)
+        prev_info_recv = info_recv
+        f.write(json.dumps(info_recv))
