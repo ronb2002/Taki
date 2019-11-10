@@ -29,7 +29,7 @@ def try_to_place(info_recv, card, order=""):
         for crd in info_recv['hand']:
             if crd['color'] == info_recv['pile_color'] and crd != card:
                 additional_cards.append(crd)
-        if len(additional_cards) == 0 or card['value'] == 'STOP' or card['value'] == 'CHDIR':
+        if card == '' or len(additional_cards) == 0 or card['value'] == 'STOP' or card['value'] == 'CHDIR':
             taki_active = False
             return {'card': card, 'order': 'close_taki'}
 
@@ -112,7 +112,8 @@ if our_id > 5:
     our_id = 3
 open('info.json', 'w').close() # Erases file contents
 with(open('info.json', 'a')) as f:
-    f.write(json.dumps({'our_id': our_id}))
+    if our_id == 1:  # NEEDS TO BE DELETED BEFORE TURN IN!
+        f.write(json.dumps({'our_id': our_id}) + '\n')
     while True:
         info_recv = tcpCliSock.recv(BUFSIZ)[4:]
         try:
@@ -129,4 +130,5 @@ with(open('info.json', 'a')) as f:
             command = json.dumps(command, **json_kwargs)
             tcpCliSock.send(command)
         prev_info_recv = info_recv
-        f.write(json.dumps(info_recv))
+        if our_id == 1:  # NEEDS TO BE DELETED BEFORE TURN IN!
+            f.write(json.dumps(info_recv) + '\n')
