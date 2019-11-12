@@ -1,8 +1,8 @@
 from socket import *
 import re
-import sys
 import json
-# NOT UPDATED. USE backend_ratings!
+from ratings import *
+
 # --- CONSTANTS ---
 json_kwargs = {'default': lambda o: o.__dict__, 'sort_keys': True, 'indent': 4}
 HOST = 'localhost'
@@ -24,14 +24,6 @@ def try_to_place(info_recv, card, order=""):
     """
     global taki_active
     # This block of code decides whether to close the taki
-    if taki_active:
-        additional_cards = []
-        for crd in info_recv['hand']:
-            if crd['color'] == info_recv['pile_color'] and crd != card:
-                additional_cards.append(crd)
-        if card == '' or len(additional_cards) == 0 or card['value'] == 'STOP' or card['value'] == 'CHDIR':
-            taki_active = False
-            return {'card': card, 'order': 'close_taki'}
 
     if card != '':
         return {'card': card, 'order': order}
@@ -48,71 +40,82 @@ def choose_card(info_recv, prev_info_recv):
     """
     global taki_active
     hand = info_recv['hand']
+    pile_colour = info_recv['pile_color']
+
+    need_to_plus2 = False
     pile = info_recv['pile']
     # Pile Color is needed because sometimes the color is unknown just looking at the top card
-    pile_color = info_recv['pile_color']
-    direction = info_recv['turn_dir']
     other_hands = info_recv['others']
     # This block of code checks if a +2 needs to be added
-    if prev_info_recv:
+    if prev_info_recv and info_recv['pile']['value'] == "+2":
         other_hands_prev = prev_info_recv['others']
         if len(other_hands) == len(other_hands_prev):
             need_to_plus2 = True
             for i in range(len(other_hands)):
-                if other_hands_prev[i] + 2 <= other_hands[i]:
+                if other_hands_prev[i] < other_hands[i]:
                     need_to_plus2 = False
-            if need_to_plus2 and pile['value'] == '+2':
-                for c in hand:
-                    if c['value'] == '+2' and c['color'] == pile_color:
-                        return try_to_place(info_recv, c)
-                return try_to_place(info_recv, "", 'draw card')
 
-    for c in hand:
-        if c['value'] == 'TAKI' and (c['color'] == pile_color or c['color'] == 'ALL'):
+    rates = []
+    for card in hand:
+        val = card['value']
+        if val.isdigit():
+            rates.append([card, eval("regular_rating(info_recv,card['color'],val,taki_active,need_to_plus2)")])
+        else:
+            val = val.replace("+", "PLUS")
+            rates.append([card, eval(val + "_rating(info_recv,card['color'],taki_active,need_to_plus2)")])
+    rates = filter(lambda x: x[1] != -1, rates)
+    try:
+        card_to_play = max(rates, key=lambda x: x[1])[0]
+        val_to_play = card_to_play['value']
+        if val_to_play == "TAKI":
             taki_active = True
-            return try_to_place(info_recv, c)
-    for c in hand:
-        if c['value'] == '+' and c['color'] == pile_color:
-            return try_to_place(info_recv, c)
-    if taki_active:
-        for c in hand:
-            if (9 <= c['value'] >= 0) and c['color'] == pile_color:
-                return try_to_place(info_recv, c)
-    for c in hand:
-        if (c['value'] == 'STOP' or c['value'] == 'CHDIR') and c['color'] == pile_color:
-            return try_to_place(info_recv, c)
-    for c in hand:
-        if (9 <= c['value'] >= 0) and c['color'] == pile_color:
-            return try_to_place(info_recv, c)
-    for c in hand:
-        if c['value'] == pile['value']:
-            return try_to_place(info_recv, c)
-    for c in hand:
-        if c['value'] == '+2' and c['color'] == pile_color:
-            return try_to_place(info_recv, c)
-    for c in hand:
-        if c['value'] == 'CHCOL':
-            colors = {'red': 0, 'yellow': 0, 'green': 0, 'blue': 0}
-            for crd in hand:
+            return try_to_place(info_recv, card_to_play)
+        if taki_active:
+            if val_to_play in ("+", "+2", "STOP", "CHDIR", "CHCOL") or len(
+                    filter(lambda x: x['color'] == pile_colour or x['value'] == "CHCOL", hand)) == 0:
+                taki_finished = True
+            else:
+                taki_finished = False
+            if not val_to_play == "CHCOL":
+                if taki_finished:
+                    return try_to_place(info_recv, card_to_play, "close taki")
+                else:
+                    return try_to_place(info_recv, card_to_play)
+            else:
+                colors = {'red': 0, 'yellow': 0, 'green': 0, 'blue': 0}
+                for crd in hand:
                     if crd['color'] != 'ALL':
                         colors[crd['color']] += 1
-            return try_to_place(info_recv, c, order=max(colors, key=colors.get))
-    return try_to_place(info_recv, "", 'draw card')
+                return try_to_place(info_recv, card_to_play, order=max(colors, key=colors.get))
+        elif not val_to_play == "CHCOL":
+            return try_to_place(info_recv, card_to_play)
+        else:
+            colors = {'red': 0, 'yellow': 0, 'green': 0, 'blue': 0}
+            for crd in hand:
+                if crd['color'] != 'ALL':
+                    colors[crd['color']] += 1
+            return try_to_place(info_recv, card_to_play, order=max(colors, key=colors.get))
+    except ValueError:
+        return try_to_place(info_recv, "", 'draw card')
 
 
 tcpCliSock = socket(AF_INET, SOCK_STREAM)  # Initial connection to server
 tcpCliSock.connect(ADDR)
 tcpCliSock.send('1234')  # Server Password
+
 info_recv = tcpCliSock.recv(BUFSIZ)
 print('connected')
+
 info_recv = tcpCliSock.recv(BUFSIZ)[4:]
 our_id = int(re.findall('[0-9]+', info_recv)[0])  # Retrieval of our ID from the server
 print(our_id)
+
 if our_id > 5:
     our_id = 3
-open('info.json', 'w').close() # Erases file contents
+
+open('info.json', 'w').close()  # Erases file contents
 with(open('info.json', 'a')) as f:
-    if our_id == 1:  # NEEDS TO BE DELETED BEFORE TURN IN!
+    if our_id == 1:  # NEEDS TO BE CHANGED LATER
         f.write(json.dumps({'our_id': our_id}) + '\n')
     while True:
         info_recv = tcpCliSock.recv(BUFSIZ)[4:]
@@ -121,8 +124,15 @@ with(open('info.json', 'a')) as f:
         except:
             print("JSON NOT RECIEVED:")
             print(info_recv)
-            sys.exit()
+            command = json.dumps({'card': {'value': '', 'color': ''}, 'order': 'draw card'}, **json_kwargs)
+            tcpCliSock.send(command)
+            continue
         turn = info_recv['turn']
+        try:
+            if not turn == prev_info_recv['turn']:
+                taki_active = False
+        except TypeError:
+            taki_active = False
         if turn == our_id:
             print(info_recv)
             command = choose_card(info_recv, prev_info_recv)  # Choose which card to play
@@ -130,5 +140,5 @@ with(open('info.json', 'a')) as f:
             command = json.dumps(command, **json_kwargs)
             tcpCliSock.send(command)
         prev_info_recv = info_recv
-        if our_id == 1:  # NEEDS TO BE DELETED BEFORE TURN IN!
+        if our_id == 1:  # NEEDS TO BE CHANGED LATER
             f.write(json.dumps(info_recv) + '\n')
