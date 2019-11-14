@@ -1,5 +1,5 @@
-from socket import *
-import re
+from socket import *  # Backend - Taki Ron, Giora, David, Yoni
+import re  # imported modules
 import json
 import sys
 from ratings import *
@@ -16,7 +16,7 @@ taki_active = False  # If Taki has been played but not yet closed
 error_occurred = False
 
 
-def try_to_place(info_recv, card, order=""):
+def try_to_place(info_recv, card, order=""):  # place card or return order, most likely draw card
     """
     This function recieves the card that needs to be sent and creates a message that needs to be sent to the server
     :param info_recv: Information recieved from the server (json)
@@ -31,7 +31,7 @@ def try_to_place(info_recv, card, order=""):
         return {'card': {'value': '', 'color': ''}, 'order': order}
 
 
-def choose_card(info_recv, prev_info_recv):
+def choose_card(info_recv, prev_info_recv):  # Choose card from rating system
     """
     This function chooses which card to play
     :param info_recv: information received from the server (json)
@@ -70,7 +70,7 @@ def choose_card(info_recv, prev_info_recv):
         if val_to_play == "TAKI":
             taki_active = True
             return try_to_place(info_recv, card_to_play)
-        if taki_active:
+        if taki_active:  # play cards during taki chain, then close
             if val_to_play in ("+", "+2", "STOP", "CHDIR", "CHCOL") or len(
                     filter(lambda x: x['color'] == pile_colour or x['value'] == "CHCOL", hand)) == 0:
                 taki_finished = True
@@ -104,7 +104,7 @@ try:
     tcpCliSock = socket(AF_INET, SOCK_STREAM)  # Initial connection to server
     tcpCliSock.connect(ADDR)
 except:
-    print("Can't connect. Check IP and Port.")
+    print("Can't connect. Check IP and Port.")  # something wrong with connection, then exit
     sys.exit()
 
 tcpCliSock.send('1234')  # Server Password
@@ -145,7 +145,7 @@ with(open('info.json', 'a')) as f:
             if not turn == prev_info_recv['turn']:  # Taki has ended if prev. turn wasn't ours
                 taki_active = False
         except TypeError:
-            taki_active = False
+            taki_active = False  # taki chain finished
         if turn == our_id:  # If it's our turn
             print(info_recv)
             command = choose_card(info_recv, prev_info_recv)  # Choose which card to play
