@@ -61,8 +61,8 @@ def STOP_rating(info_recv, colour, is_taki, need_to_plus2):
         direction = info_recv['turn_dir']
         #base rating multiplied by 1 - the ration between cards next player has
         #and cards we have. (1- because the less cards he has the more i want to
-        #play stop). if the rate is negative sends 0 instead
-        return max(base_ratings["STOP"]*(1-others[(my_place+direction) % len(others)]/others[my_place]), 0)
+        #play stop). if the rate is negative sends -0.1 instead
+        return max(base_ratings["STOP"]*(1-others[(my_place+direction) % len(others)]/others[my_place]), -0.1)
     else:
         return -1
 
@@ -158,20 +158,34 @@ def CHDIR_rating(info_recv, colour, is_taki, need_to_plus2):
         my_id = info_recv['turn']
         my_place = [i for i in range(len(players)) if players[i] == my_id][0]
         direction = info_recv['turn_dir']
-        return max(-0.1,base_ratings["CHDIR"]*(1-others[(my_place+direction) % len(others)]/others[(my_place-direction) % len(others)]))
+        return max(-0.2,base_ratings["CHDIR"]*(1-others[(my_place+direction) % len(others)]/others[(my_place-direction) % len(others)]))
     else:
         return -1
 
 
 def PLUS2_rating(info_recv, colour, is_taki, need_to_plus2):
+    """
+    checks if can play a +2 card and returns a rating based on the ratio
+    of the amount of cards the next player has and the amount of cards we have.
+    info_recv is the general information from the server
+    colour is the card's colour
+    is_taki is whether a taki has been opened
+    need_to_plus2 is whether the bot has to play a +2 card
+    return: -1 if should not play the card, a rating otherwise
+    """
+    
     pile_colour = info_recv['pile_color']
+    #checks if we can play the card
     if pile_colour == colour or info_recv['pile']['value'] == "+2":
         players = info_recv["players"]
         others = info_recv['others']
         my_id = info_recv['turn']
         my_place = [i for i in range(len(players)) if players[i] == my_id][0]
         direction = info_recv['turn_dir']
-        return base_ratings["PLUS2"]*(1-others[(my_place+direction) % len(others)]/others[my_place])
+        #base rating multiplied by 1 - the ration between cards next player has
+        #and cards we have. (1- because the less cards he has the more i want to
+        #play +2). if the rate is negative sends 0 instead
+        return max(base_ratings["PLUS2"]*(1-others[(my_place+direction) % len(others)]/others[my_place]),0)
     else:
         return -1
 
