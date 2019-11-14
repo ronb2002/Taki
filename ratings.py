@@ -158,7 +158,7 @@ def CHDIR_rating(info_recv, colour, is_taki, need_to_plus2):
         my_id = info_recv['turn']
         my_place = [i for i in range(len(players)) if players[i] == my_id][0]
         direction = info_recv['turn_dir']
-        return base_ratings["CHDIR"]*(others[(my_place-direction) % len(others)]/others[(my_place+direction) % len(others)])
+        return max(-0.1,base_ratings["CHDIR"]*(1-others[(my_place+direction) % len(others)]/others[(my_place-direction) % len(others)]))
     else:
         return -1
 
