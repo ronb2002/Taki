@@ -79,11 +79,9 @@ class GameManagerSingleton(object):
         This function is being called every time we receive a message.
         Each time we get a message we have to check that the player_id is the one who has to play
         and then play the "game" for that move.
-
         1. play the game with the given card and the given player_id.
         2. update the game state.
         3. change the self.state dict and keep it up to date.
-
         :param player_id: int from 0 to players length - 1
         :param card_color: A string stating the color
         :param card_value: A string stating the value
@@ -117,21 +115,21 @@ class GameManagerSingleton(object):
         if order == 'draw card':
             if self.pile_state == S_NOTHING:
                 # Then take one card and move the turn forward
-                self.hands[player_id].draw_cards_from_deck()    
+                self.hands[player_id].draw_cards_from_deck()
 
             elif self.pile_state == S_PLUS2:
                 # Then take two cards times the plus2_counter and move the turn forward
                 self.hands[player_id].draw_cards_from_deck(num_cards=2 * self.plus2_counter)
-                
+
             elif self.pile_state == S_TAKI:
                 # take one and close the taki
-                self.hands[player_id].draw_cards_from_deck()  
-                 
+                self.hands[player_id].draw_cards_from_deck()
+
             p_state = {
                 'turn': self.get_next_player(),
                 'others': [len(h.pack) for h in self.hands.values()]
             }
-        
+
             self.plus2_counter = 0
             self.state.update(p_state)
             self.pile_state = S_NOTHING
@@ -157,27 +155,30 @@ class GameManagerSingleton(object):
             if card.value != '+2':
                 return {'error': '03'}
 
+        if self.pile_state == S_TAKI and card.color != self.state['pile_color']:
+            return {'error': '06'}
+
         if card.value == 'CHDIR':
             self.state['turn_dir'] *= -1
             self.pile_state = S_NOTHING
 
         elif card.value == 'STOP':
-            self.get_next_player()
+            self.state.update(turn=self.get_next_player())
             self.pile_state = S_NOTHING
 
         elif card.value == 'TAKI':
             self.pile_state = S_TAKI
-                
+
         elif card.value == 'CHCOL':
             if order in self.colors:
                 self.state['pile_color'] = order
                 self.pile_state = S_NOTHING
             else:
                 return {'error': '04'}
-       
+
         elif card.value == '+2':
             self.pile_state = S_PLUS2
-            self.plus2_counter += 1        
+            self.plus2_counter += 1
 
         if card.color != 'ALL':
             self.state['pile_color'] = card.color
@@ -185,17 +186,16 @@ class GameManagerSingleton(object):
         if trial_state is not None:
             self.pile_state = trial_state
 
+        # If the card is Taki or Plus we simply don't touch the turn.
         if self.pile_state != S_TAKI and card.value != '+':
-            new_turn = self.get_next_player()
-        else:
-            new_turn = cur_turn
+            cur_turn = self.get_next_player()
 
         self.hands[player_id].remove_card(card)
         self.deck.add_cards((cur_pile,))
 
         p_state = {
             'pile': card,
-            'turn': new_turn,
+            'turn': cur_turn,
             'others': [len(h.pack) for h in self.hands.values()]
         }
 
@@ -224,4 +224,3 @@ class GameManagerSingleton(object):
             del self.hands[player_id]
             # If there is only one player left we add him to the winners, disconnect him and finish the game
             self.last_player()
-
