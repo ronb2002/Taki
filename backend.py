@@ -2,7 +2,7 @@ from socket import *
 import re
 import sys
 import json
-
+# NOT UPDATED. USE backend_ratings!
 # --- CONSTANTS ---
 json_kwargs = {'default': lambda o: o.__dict__, 'sort_keys': True, 'indent': 4}
 HOST = 'localhost'

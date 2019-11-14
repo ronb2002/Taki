@@ -95,7 +95,7 @@ class Deck(Pack):
         Returns:
             card [Card] -- [Top of the deck]
         """
-        return self.pack.pop() 
+        return self.pack.pop(0)
     
     def provide_cards(self, num_cards):
         """[Provides a specific amout of cards from the deck]
@@ -143,10 +143,10 @@ class Hand(Pack):
     """
     The few cards every player holds.
     """
-    def __init__(self, deck):
+    def __init__(self, deck, cards_amount):
         Pack.__init__(self)
         self.deck = deck
-        self.draw_cards_from_deck(8)
+        self.draw_cards_from_deck(cards_amount)
     
     def draw_cards_from_deck(self, num_cards=1):
         """
@@ -162,3 +162,8 @@ class Hand(Pack):
             if c.value == card.value and c.color == card.color:
                 self.pack.remove(c)
                 return c
+
+    def print_hand(self):
+        for card in self.pack:
+            print '(' + card.color + ', ' + card.value + ')',
+        print

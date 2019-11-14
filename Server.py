@@ -6,7 +6,7 @@ host_ip = raw_input("What is the host ip: ")
 THE_PASSWORD = "1234"
 
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server.setblocking(False)
+server.setblocking(0)
 server.bind((host_ip, 50000))
 server.listen(5)
 
@@ -18,17 +18,20 @@ outputs = []
 message_queues = {}
 
 game_is_started = False
+max_players = 4  # A number between 2 - 8
+initial_cards_amount = 8
 
 new_users = []
 normal_users = {}
 
-json_kwargs = {'default': lambda o: o.__dict__, 'sort_keys': True, 'indent': 1}
+json_kwargs = {'default': lambda o: o.__dict__, 'sort_keys': True, 'indent': 0}
 
-timeout_duration = 10  # secs
+timeout_duration = 5  # secs
 timeout_timer = timeout_duration
 
 
 def serialize(msg):
+    # Add a 4 byte length prefix to every message.
     len_prefix = len(msg.encode('utf-8'))
     return (str(len_prefix).zfill(4)) + msg
 
@@ -54,7 +57,7 @@ def on_disconnect(s, inputs, outputs, writable, message_queues):
 
 
 try:
-    game_manager = GameManagerSingleton()
+    game_manager = GameManagerSingleton(max_players, initial_cards_amount)
     print "Setup complete"
     while inputs:
         # W8S here until a message has been received.
@@ -62,24 +65,25 @@ try:
 
         if game_is_started:
             if timeout_timer < time.time():
-                print "True"
                 curr_turn = game_manager.state.get('turn')
+                print "Timeout, player ID", curr_turn
                 # Forces the player to draw a card
                 game_manager.update_game(curr_turn, "", "", "draw card")
                 # Broadcast the new state to everyone
                 for sock, p in normal_users.items():
-                    # This function will return a dictionary (Player: state)
+                    # This function will return a dictionary (Player: State)
                     new_state = game_manager.get_state(p.id)
                     if new_state:
-                        message_queues[sock].put(json.dumps(new_state, **json_kwargs))
+                        message_queues[sock].put(new_state.copy())
                 # Reset the timer
                 timeout_timer = time.time() + timeout_duration
 
         if game_manager.game_is_finished or len(game_manager.players) == 0:
             print 'Game Over Bye Bye'
-            print game_manager.state.get('winners')
+            print 'Winners:', game_manager.state.get('winners')
+            over_dict = {'command': 'Game Over', 'winners': game_manager.state.get('winners')}
             for s in outputs:
-                s.send('Game Over')
+                s.send(serialize(json.dumps(over_dict, **json_kwargs)))
 
             inputs = []
             server.close()
@@ -113,25 +117,25 @@ try:
                     elif s in new_users:
                         # New Connections
                         if game_is_started:
-                            message_queues[s].put('Game is undergoing')
+                            message_queues[s].put({'command': 'Game is undergoing'})
                             continue
 
                         if THE_PASSWORD not in data:
-                            message_queues[s].put('Wrong Password :(')
+                            message_queues[s].put({'command': 'Wrong Password :('})
                             continue
 
                         new_users.remove(s)
                         normal_users[s] = Player(s)
 
-                        message_queues[s].put('Login Successful')
+                        message_queues[s].put({'command': 'Login Successful'})
 
                         if Player.p_count == game_manager.total_players:
                             game_is_started = True
                             timeout_timer = time.time() + timeout_duration
                             for sock, p in normal_users.items():
-                                message_queues[sock].put('Game Started, player ID ' + str(p.id))
-                                new_state = json.dumps(game_manager.get_state(p.id), **json_kwargs)
-                                message_queues[sock].put(new_state)
+                                message_queues[sock].put({'command': 'Game Started, player ID ' + str(p.id)})
+                                new_state = game_manager.get_state(p.id)
+                                message_queues[sock].put(new_state.copy())
 
                     elif s in normal_users.keys():
                         # Normal communication
@@ -144,32 +148,32 @@ try:
                                 c_value = str(data['card']['value'])  # String
                                 p_order = str(data['order'])  # String
                             except:
-                                answer = 'Error[12]'
+                                answer = {'error': '12'}
                             else:
                                 answer = game_manager.update_game(normal_users[s].id, c_color, c_value, p_order)
 
-                            if answer != 'OK':
+                            # Empty string for error is OK therefore the turn was completed gracefully.
+                            if answer['error'] != '':
                                 message_queues[s].put(answer)
                             else:
                                 for sock, p in normal_users.items():
                                     # This function will return a dictionary (Player: state)
                                     new_state = game_manager.get_state(p.id)
                                     if new_state:
-                                        message_queues[sock].put(json.dumps(new_state, **json_kwargs))
+                                        message_queues[sock].put(new_state.copy())
 
                                 timeout_timer = time.time() + timeout_duration
                         else:
-                            message_queues[s].put("Error[11]")
+                            message_queues[s].put({'error': '11'})
 
         for s in writable:
             try:
                 next_msg = message_queues[s].get_nowait()
-                # Quick and dirty solution next_msg = str(next_msg) + ((1024 - len(next_msg.encode('utf-8'))) * ' ')
             except Queue.Empty:
                 pass
             else:
                 try:
-                    s.send(serialize(next_msg))
+                    s.send(serialize(json.dumps(next_msg, **json_kwargs)))
                 except socket.error as e:
                     print 'Send Error' + str(e)
 
