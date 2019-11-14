@@ -223,7 +223,11 @@ def PLUS2_rating(info_recv, colour, is_taki, need_to_plus2):
         # base rating multiplied by 1 - the ration between cards next player has
         # and cards we have. (1- because the less cards he has the more i want to
         # play +2). if the rate is negative sends 0 instead
-        return max(base_ratings["PLUS2"] * (1 - others[(my_place + direction) % len(others)] / others[my_place]), 0)
+        try:
+            the_rating = max(base_ratings["PLUS2"] * (1 - others[(my_place + direction) % len(others)] / others[my_place]), 0)
+        except:
+            return -1
+        return the_rating
     else:
         return -1
 
