@@ -1,6 +1,7 @@
 from socket import *
 import re
 import json
+import sys
 from ratings import *
 
 # --- CONSTANTS ---
@@ -12,6 +13,7 @@ ADDR = (HOST, PORT)
 # ----------------
 prev_info_recv = None  # Previous information taken from server (for comp. with new info)
 taki_active = False  # If Taki has been played but not yet closed
+error_occurred = False
 
 
 def try_to_place(info_recv, card, order=""):
@@ -23,11 +25,9 @@ def try_to_place(info_recv, card, order=""):
     :return: command that needs to be sent to the server (json)
     """
     global taki_active
-    # This block of code decides whether to close the taki
-
     if card != '':
         return {'card': card, 'order': order}
-    else:
+    else:  # If no card is selected to be played
         return {'card': {'value': '', 'color': ''}, 'order': order}
 
 
@@ -58,7 +58,7 @@ def choose_card(info_recv, prev_info_recv):
     rates = []
     for card in hand:
         val = card['value']
-        if val.isdigit():
+        if val.isdigit(): # Regular rating is given to 'digit' card
             rates.append([card, eval("regular_rating(info_recv,card['color'],val,taki_active,need_to_plus2)")])
         else:
             val = val.replace("+", "PLUS")
@@ -90,6 +90,7 @@ def choose_card(info_recv, prev_info_recv):
         elif not val_to_play == "CHCOL":
             return try_to_place(info_recv, card_to_play)
         else:
+            # This block of code counts the amount of cards of each color to know which color to switch to
             colors = {'red': 0, 'yellow': 0, 'green': 0, 'blue': 0}
             for crd in hand:
                 if crd['color'] != 'ALL':
@@ -99,56 +100,58 @@ def choose_card(info_recv, prev_info_recv):
         return try_to_place(info_recv, "", 'draw card')
 
 
-tcpCliSock = socket(AF_INET, SOCK_STREAM)  # Initial connection to server
-tcpCliSock.connect(ADDR)
+try:
+    tcpCliSock = socket(AF_INET, SOCK_STREAM)  # Initial connection to server
+    tcpCliSock.connect(ADDR)
+except:
+    print("Can't connect. Check IP and Port.")
+    sys.exit()
+
 tcpCliSock.send('1234')  # Server Password
 
 info_recv = tcpCliSock.recv(BUFSIZ)
-print('connected')
+print('Connected!')
 
 info_recv = tcpCliSock.recv(BUFSIZ)[4:]
 our_id = int(re.findall('[0-9]+', info_recv)[0])  # Retrieval of our ID from the server
 print(our_id)
 
-if our_id > 5:
+if our_id > 5:  # Last message sent are already the cards
     our_id = 3
 
 open('info.json', 'w').close()  # Erases file contents
 with(open('info.json', 'a')) as f:
-    if our_id == 1:  # NEEDS TO BE CHANGED LATER
+    if our_id == 1:  # NEEDS TO BE CHANGED LATER, ONLY FOR TEST GAMES
         f.write(json.dumps({'our_id': our_id}) + '\n')
     while True:
         info_recv = tcpCliSock.recv(BUFSIZ)[4:]
         try:
             info_recv = json.loads(info_recv)
         except:
-            print("JSON NOT RECIEVED:")
+            error_occurred = True
+        if 'error' in info_recv or error_occurred:
+            print('Error!')
             print(info_recv)
             command = json.dumps({'card': {'value': '', 'color': ''}, 'order': 'draw card'}, **json_kwargs)
             tcpCliSock.send(command)
+            error_occurred = False
             continue
-        if 'error' in info_recv:
-            print('Error')
-            print(info_recv)
-            command = json.dumps({'card': {'value': '', 'color': ''}, 'order': 'draw card'}, **json_kwargs)
-            tcpCliSock.send(command)
-            continue
-        if 'command' in info_recv:
-            print('Game ended')
+        if 'command' in info_recv:  # Game has ended
+            print('Game Ended')
             print(info_recv)
             break
         turn = info_recv['turn']
         try:
-            if not turn == prev_info_recv['turn']:
+            if not turn == prev_info_recv['turn']:  # Taki has ended if prev. turn wasn't ours
                 taki_active = False
         except TypeError:
             taki_active = False
-        if turn == our_id:
+        if turn == our_id:  # If it's our turn
             print(info_recv)
             command = choose_card(info_recv, prev_info_recv)  # Choose which card to play
             print(command)
             command = json.dumps(command, **json_kwargs)
-            tcpCliSock.send(command)
+            tcpCliSock.send(command)  # Send json to server
         prev_info_recv = info_recv
-        if our_id == 1:  # NEEDS TO BE CHANGED LATER
+        if our_id == 1:  # NEEDS TO BE CHANGED LATER, ONLY FOR TEST GAMES
             f.write(json.dumps(info_recv) + '\n')
