@@ -27,7 +27,7 @@ def TAKI_rating(info_recv, colour, is_taki, need_to_plus2):
                 count = count+1
         #it's better to play a regular taki that an ALL taki
         if actual_colour=="ALL":
-            return base_ratings["TAKI"]*count/len(hand)-0.01
+            return base_ratings["TAKI"]*count/len(hand)+0.01
         else:
             return base_ratings["TAKI"]*count/len(hand)
     else:
