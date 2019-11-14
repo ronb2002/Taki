@@ -52,8 +52,8 @@ def regular_rating(info_recv, colour, value, is_taki, need_to_plus2):
     if need_to_plus2:
         return -1
     pile_colour = info_recv['pile_color']
-    if pile_colour == colour or info_recv['pile']['value'] == value:
-        if is_taki and pile_colour == colour:
+    if pile_colour == colour or (info_recv['pile']['value'] == value and not is_taki):
+        if is_taki:
             return base_ratings["regular"]
         else:
             return base_ratings["regular"]/20.0
