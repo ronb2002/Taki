@@ -127,12 +127,16 @@ with(open('info.json', 'a')) as f:
             command = json.dumps({'card': {'value': '', 'color': ''}, 'order': 'draw card'}, **json_kwargs)
             tcpCliSock.send(command)
             continue
-        if 'error' in info_recv or 'command' in info_recv:
-            print('Error or End of Game')
+        if 'error' in info_recv:
+            print('Error')
             print(info_recv)
             command = json.dumps({'card': {'value': '', 'color': ''}, 'order': 'draw card'}, **json_kwargs)
             tcpCliSock.send(command)
             continue
+        if 'command' in info_recv:
+            print('Game ended')
+            print(info_recv)
+            break
         turn = info_recv['turn']
         try:
             if not turn == prev_info_recv['turn']:
