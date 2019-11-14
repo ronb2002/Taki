@@ -102,10 +102,22 @@ def CHCOL_rating(info_recv, colour, is_taki, need_to_plus2):
 
 
 def regular_rating(info_recv, colour, value, is_taki, need_to_plus2):
+    """
+    checks if can play a regular number card and rates based on the situation
+    info_recv is the general information from the server
+    colour is the card's colour
+    value is the card's value
+    is_taki is whether a taki has been opened
+    need_to_plus2 is whether the bot has to play a +2 card
+    return: -1 if should not play the card, a rating otherwise
+    """
     if need_to_plus2:
         return -1
+    
     pile_colour = info_recv['pile_color']
+    #checks if the card can be played
     if pile_colour == colour or (info_recv['pile']['value'] == value and not is_taki):
+        #if a taki was played plays this card, otherwise gives it a low score
         if is_taki:
             return base_ratings["regular"]
         else:
