@@ -1,0 +1,8 @@
+This is the RFC file of the Taki Bot and Front-End created by Ron, Giora, Yoni and David.
+The bot:
+The bot connects to the Taki server (creaed by Kfir), and when all the players are ready plays the game Taki as one of the players.
+The bot assess the top pile card, the cards it has, the amount of cards its opponents have, and more, and chooses a card to play.
+The bot tries to win the Taki game.
+Front-End:
+The Front-End shows the Taki game in a graphic layout.
+It shows the cards the bot has, the amount of cards its opponents have, the top pile card, the players' moves and more.
