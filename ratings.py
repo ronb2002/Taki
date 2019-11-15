@@ -217,6 +217,8 @@ def PLUS2_rating(info_recv, colour, is_taki, need_to_plus2):
     if pile_colour == colour or info_recv['pile']['value'] == "+2":
         players = info_recv["players"]
         others = info_recv['others']
+        while 0 in others:
+            others.remove(0)
         my_id = info_recv['turn']
         my_place = [i for i in range(len(players)) if players[i] == my_id][0]
         direction = info_recv['turn_dir']
